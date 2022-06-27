@@ -3,7 +3,7 @@ var timeline = {
 		// Store the query result
 			var queryResult = DA.query.getQueryResult();
 
-		// Ensure the query meets the conditions (move some to after settings retrieval)
+		// Ensure the query meets the conditions
 			var query = DA.query.getQuery();
 			if (queryResult.rows.length === 0) { // If query has no data
 				var container = d3.select('#__da-app-content').append('div')
@@ -30,6 +30,29 @@ var timeline = {
 				container.append('div')
 					.style('font-size', '12px')
 					.text('Check data or applied filters');
+				javascriptAbort();  // Garbage meaningless function to get the widget to stop processing
+			}
+			else if (queryResult.fields.filter(x => x.type == 'dimension').length < 3) { // If query has fewer than three dimensions (main, start, end)
+				var container = d3.select('#__da-app-content').append('div')
+					.style('color', 'rgba(0, 1, 2, 0.49)')
+					.style('width', '100%')
+					.style('height', '100%')
+					.style('display', 'flex')
+					.style('flex-direction', 'column')
+					.style('justify-content', 'center')
+					.style('align-items', 'center');
+				container.append('div')
+					.style('font-size', '14px')
+					.style('margin-bottom', '3px')
+					.text('Invalid Query Settings');
+				var message = container.append('div')
+					.style('font-size', '12px');
+				message.append('span').text('To populate this widget, add at least three dimensions:');
+				var reqList = message.append('ul');
+				reqList.append('li').text('a main label;');
+				reqList.append('li').text('a start date; and');
+				reqList.append('li').text('an end date.')
+				message.append('span').text('Then check the widget\'s Design tab.')
 				javascriptAbort();  // Garbage meaningless function to get the widget to stop processing
 			}
 
@@ -250,6 +273,31 @@ var timeline = {
 
 		// Get the design settings, then create the widget
 			getDesignSettings().then(settings => {
+				// Ensure no leftover invalid settings selections
+					['mainDim', 'startdate', 'endDate', 'groupDim', 'colourDim', 'numerator', 'denominator'].forEach(option => {
+						if (settings[option] != 'None' && queryResult.fields.map(x => x.systemName).indexOf(settings[option]) == -1) {
+							var container = d3.select('#__da-app-content').append('div')
+								.style('color', 'rgba(0, 1, 2, 0.49)')
+								.style('width', '100%')
+								.style('height', '100%')
+								.style('display', 'flex')
+								.style('flex-direction', 'column')
+								.style('justify-content', 'center')
+								.style('align-items', 'center');
+							container.append('div')
+								.style('font-size', '14px')
+								.style('margin-bottom', '3px')
+								.text('Invalid Design Settings');
+							var message = container.append('div')
+								.style('font-size', '12px');
+							message.append('div')
+								.text('A field selected in the widget\'s Design tab was removed.');
+							message.append('div')
+								.text('Choose a replacement, or pick None.')
+							javascriptAbort();  // Garbage meaningless function to get the widget to stop processing
+						}
+					});
+
 				// Function to get bar colours
 					function getBarColour(data, elementType) {
 						var opacity = elementType == 'bar' ? 0.2 : 1;
@@ -604,7 +652,7 @@ var timeline = {
 										}
 									});
 							}
-							else {
+							else if (settings.numerator != 'None' && settings.denominator != 'None') {
 								tooltipProgress.append('div')
 									.attr('class', 'tooltip-category')
 									.text('Progress');

@@ -274,7 +274,7 @@ var timeline = {
 		// Get the design settings, then create the widget
 			getDesignSettings().then(settings => {
 				// Ensure no leftover invalid settings selections
-					['mainDim', 'startdate', 'endDate', 'groupDim', 'colourDim', 'numerator', 'denominator'].forEach(option => {
+					['mainDim', 'startDate', 'endDate', 'groupDim', 'colourDim', 'numerator', 'denominator'].forEach(option => {
 						if (settings[option] != 'None' && queryResult.fields.map(x => x.systemName).indexOf(settings[option]) == -1) {
 							var container = d3.select('#__da-app-content').append('div')
 								.style('color', 'rgba(0, 1, 2, 0.49)')

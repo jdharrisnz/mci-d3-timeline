@@ -81,17 +81,20 @@ var timeline = {
 
 		// Extend the date class with getQuarter()
 			Date.prototype.getQuarter = function(quarterOffset) {
-				// Validate quarterOffset input, default January
-					quarterOffset = [0,1,2,3,4,5,6,7,8,9,10,11].includes(quarterOffset) ? quarterOffset : 0;
-
 				// Update the date with offset
-					var offsetDate = new Date(this.getFullYear(), this.getMonth() + quarterOffset, 1);
+					var offsetDate = new Date(this.getFullYear(), this.getMonth() - quarterOffset, 1);
 
-				// Work out the year based on whether we're in the year with the ending month
-					var yearDate = new Date(offsetDate.getFullYear() + (offsetDate.getMonth() < quarterOffset || quarterOffset === 0 ? 0 : 1), offsetDate.getMonth(), 1);
+				// Work out the year based on whether the ending month is yet to come this year
+					if (this.getMonth() >= quarterOffset && quarterOffset !== 0) {
+						yearAdd = 1;
+					}
+					else {
+						yearAdd = 0;
+					}
+					var yearDate = new Date(this.getFullYear() + yearAdd, this.getMonth(), 1);
 
 				// Return format example Q3 2021
-					return 'Q' + Math.ceil((this.getMonth() + 1) / 3) + ' ' + yearDate.getFullYear();
+					return 'Q' + Math.ceil((offsetDate.getMonth() + 1) / 3) + ' ' + yearDate.getFullYear();
 			};
 
 		// Function to get difference in days
@@ -151,7 +154,7 @@ var timeline = {
 			var queryDims = queryResult.fields.filter(x => x.type == 'dimension');
 			var queryMeas = queryResult.fields.filter(x => x.type == 'metric');
 
-			var options = [
+			var generalOptions = [
 				{ 'type': 'title',
 					'displayName': 'General Settings' },
 				{ 'type': 'select',
@@ -199,12 +202,25 @@ var timeline = {
 						{ 'id': 11, 'label': 'December' }
 					],
 					'defaultValue': 0,
-					'description': 'Only has an effect when selected Timeline Granularity is Month, Quarter, or Auto.' },
-				{ 'type': 'colorPicker',
-					'id': 'barColour',
-					'displayName': 'Timeline Bar Colour',
-					'defaultValue': '#4879AB',
-					'description': 'Only has an effect if colour coding is not set. A 100% opacity version of this will be used for the progress bar, and 40% opacity for the timeline bar background.' },
+					'description': 'Only has an effect when selected Timeline Granularity is Month, Quarter, or Auto.' }
+			];
+
+			var colorOptions = [
+				{ 'type': 'separator' },
+				{ 'type': 'title',
+					'displayName': 'Colour Coding Settings' },
+				{ 'type': 'select',
+					'id': 'colourCodingType',
+					'displayName': 'Colour Coding Type',
+					'options': [
+						{ 'id': 'solid', 'label': 'Single Colour' },
+						{ 'id': 'dimension', 'label': 'Based on Dimension' },
+						{ 'id': 'pacing', 'label': 'Based on Pacing' }
+					],
+					'defaultValue': 'solid' }
+			];
+			
+			var restOfOptions = [
 				{ 'type': 'separator' },
 				{ 'type': 'title',
 					'displayName': 'Dimension Roles' },
@@ -232,18 +248,6 @@ var timeline = {
 					'options': [{ 'id': 'None', 'label': 'None' }].concat(queryDims.map(x => { return { 'id': x.systemName, 'label': x.name }; })),
 					'defaultValue': 'None',
 					'description': 'Select the dimension by which to segment the timeline. If "None" is selected, a single group will be created with the name of the main dimension.' },
-				{ 'type': 'select',
-					'id': 'colourDim',
-					'displayName': 'Timeline Colour Coding',
-					'options': [{ 'id': 'None', 'label': 'None' }].concat(queryDims.map(x => { return { 'id': x.systemName, 'label': x.name }; })),
-					'defaultValue': 'None',
-					'description': 'Select the dimension by which to colour code the bars.' },
-				{ 'type': 'select',
-					'id': 'colourSet',
-					'displayName': 'Colour Coding Scale',
-					'options': ['Turbo', 'Viridis', 'Inferno', 'Magma', 'Plasma', 'Cividis', 'Warm', 'Cool'].map(x => { return { 'id': x, 'label': x }; }),
-					'defaultValue': 'Turbo',
-					'description': 'If Timeline Colour Coding is used, colours will be picked from the selected scale.' },
 				{ 'type': 'separator' },
 				{ 'type': 'title',
 					'displayName': 'Measurement Roles' },
@@ -269,12 +273,58 @@ var timeline = {
 					'description': 'If unchecked, the field and value won\'t appear in the mouseover tooltips.' }
 			];
 
-			DA.widget.customDesignSettings.set(options);
+			DA.widget.customDesignSettings.set(generalOptions.concat(colorOptions).concat(restOfOptions));
 
-		// Get the design settings, then create the widget
+		// Get the design settings, then set dependent options
 			getDesignSettings().then(settings => {
+				if (settings.colourCodingType == 'solid') {
+					colorOptions = colorOptions.concat([
+						{ 'type': 'colorPicker',
+							'id': 'barColour',
+							'displayName': 'Timeline Bar Colour',
+							'defaultValue': '#4879AB',
+							'description': 'A 100% opacity version of this will be used for the progress bar, and 20% opacity for the timeline bar background.' }
+					]);
+				}
+				else if (settings.colourCodingType == 'dimension') {
+					colorOptions = colorOptions.concat([
+						{ 'type': 'select',
+							'id': 'colourDim',
+							'displayName': 'Colour Coding Dimension',
+							'options': queryDims.map(x => { return { 'id': x.systemName, 'label': x.name }; }),
+							'defaultValue': queryDims[0].systemName,
+							'description': 'Select the dimension by which to colour code the bars.' },
+						{ 'type': 'select',
+							'id': 'colourSet',
+							'displayName': 'Colour Coding Style',
+							'options': ['Turbo', 'Viridis', 'Inferno', 'Magma', 'Plasma', 'Cividis', 'Warm', 'Cool'].map(x => { return { 'id': x, 'label': x }; }),
+							'defaultValue': 'Turbo',
+							'description': 'Colours will be picked from the selected style.' }
+					]);
+				}
+				else if (settings.colourCodingType == 'pacing') {
+					colorOptions = colorOptions.concat([
+						{ 'type': 'input',
+							'id': 'minRed',
+							'displayName': 'Minimum Red Boundary',
+							'defaultValue': '0.5',
+							'description': 'At this pace (default 50%), the bar will be coloured reddest, up to green at 100%. Enter as 0.5, 0.75, 1, 1.25, 1.5, etc..' },
+						{ 'type': 'input',
+							'id': 'maxYellow',
+							'displayName': 'Maximum Yellow Boundary',
+							'defaultValue': '1.5',
+							'description': 'At this pace (default 150%), the bar will be coloured yellowest, up from green at 100%. Enter as 0.5, 0.75, 1, 1.25, 1.5, etc..' }
+					]);
+				}
+
+			DA.widget.customDesignSettings.set(generalOptions.concat(colorOptions).concat(restOfOptions));
+
+		// Get the design settings again, then create the widget
+			return getDesignSettings();
+
+			}).then(settings => {
 				// Ensure no leftover invalid settings selections
-					['mainDim', 'startDate', 'endDate', 'groupDim', 'colourDim', 'numerator', 'denominator'].forEach(option => {
+					['mainDim', 'startDate', 'endDate', 'groupDim', 'numerator', 'denominator'].forEach(option => {
 						if (settings[option] != 'None' && queryResult.fields.map(x => x.systemName).indexOf(settings[option]) == -1) {
 							var container = d3.select('#__da-app-content').append('div')
 								.style('color', 'rgba(0, 1, 2, 0.49)')
@@ -301,20 +351,43 @@ var timeline = {
 				// Function to get bar colours
 					function getBarColour(data, elementType) {
 						var opacity = elementType == 'bar' ? 0.2 : 1;
-						if (settings.colourDim == 'None') {
-							var barColour = hexToRgb(settings.barColour);
-							if (barColour.length == 3) {
-								return 'rgba(' + barColour.join(', ') + ', '+ opacity + ')';
-							}
-							else if (barColour.length == 4) {
-								barColour[3] = opacity;
-								return 'rgba(' + barColour.join(', ') + ')';
-							}
+						if (settings.colourCodingType == 'solid') {
+							var resultColour = hexToRgb(settings.barColour);
+							return 'rgba(' + resultColour.slice(0, 3).join(', ') + ', ' + opacity + ')';
 						}
-						else {
-							var resultColour = colourScale((colourGroups.indexOf(data[colourDimIndex].formattedValue) + 1) / colourGroups.length);
+						else if (settings.colourCodingType == 'dimension') {
+							var resultColour = dimColourScale((colourGroups.indexOf(data[colourDimIndex].formattedValue) + 1) / colourGroups.length);
 							resultColour = resultColour.includes('#') ? 'rgb(' + hexToRgb(resultColour).join(',') + ')' : resultColour;
 							return 'rgba' + resultColour.slice(3, resultColour.length - 1) + ', ' + opacity + ')';
+						}
+						else if (settings.colourCodingType == 'pacing' &&
+										 settings.numerator != 'None' &&
+										 settings.denominator != 'None') {
+							var underPacingScale = d3.interpolate('#e15759', '#59a14f');
+							var overPacingScale = d3.interpolate('#59a14f', '#edc958');
+							var thisStartDate = new Date(data[startIndex].value);
+							var thisEndDate = new Date(data[endIndex].value);
+							var timeProgress = new Date() < thisStartDate
+								? 0.01
+								: thisEndDate < new Date()
+								? 1
+								: (new Date() - thisEndDate) / (thisEndDate - thisStartDate);
+							var normalisedDenom = data[denomIndex].value * timeProgress;
+							var pacing = data[numerIndex].value / normalisedDenom;
+							var minRed = settings.minRed < 1 ? settings.minRed : 0.5;
+							var maxYellow = settings.maxYellow > 1 ? settings.maxYellow : 1.5;
+							if (pacing < 1) {
+								var resultColour = underPacingScale(pacing);
+							}
+							else {
+								var resultColour = overPacingScale(pacing);
+							}
+							resultColour = resultColour.includes('#') ? 'rgb(' + hexToRgb(resultColour).join(',') + ')' : resultColour;
+							return 'rgba' + resultColour.slice(3, resultColour.length - 1) + ', ' + opacity + ')';
+						}
+						else { // Will happen when set to pacing but numerator or denominator are not set
+							var resultColour = hexToRgb('#4879AB');
+							return 'rgba(' + resultColour.slice(0, 3).join(', ') + ', ' + opacity + ')';
 						}
 					}
 
@@ -379,11 +452,11 @@ var timeline = {
 						summaryRows.push(summaryRow);
 					});
 
-				// If colour coding is set, create a legend
-					if (settings.colourDim != 'None') {
+				// If dimension colour coding is set, create a legend
+					if (settings.colourCodingType == 'dimension') {
 						var colourDimIndex = queryResult.fields.map(x => x.systemName).indexOf(settings.colourDim);
 						var colourGroups = Array.from(new Set(summaryRows.map(x => x[colourDimIndex].formattedValue)));
-						var colourScale = eval('d3.interpolate' + settings.colourSet)
+						var dimColourScale = eval('d3.interpolate' + settings.colourSet)
 
 						var legend = d3.select('#__da-app-content').insert('div', '*')
 							.attr('id', 'legend');
@@ -392,7 +465,7 @@ var timeline = {
 						.data(colourGroups)
 						.join('div')
 							.attr('class', 'legend-item')
-							.style('border-bottom-color', d => colourScale((colourGroups.indexOf(d) + 1) / colourGroups.length))
+							.style('border-bottom-color', d => dimColourScale((colourGroups.indexOf(d) + 1) / colourGroups.length))
 							.attr('title', d => d == '' ? 'Null' : d)
 							.text(d => d == '' ? 'Null' : d);
 					}
@@ -409,7 +482,7 @@ var timeline = {
 									return loopStart;
 								case 'bi-week':
 									var loopStart = new Date(queryStart.getFullYear(), queryStart.getMonth(), queryStart.getDate() - (queryStart.getDay() - settings.weekStart));
-									if (parseInt(loopStart.getWeek().slice(-1)) % 2 === 0) {
+									if (parseInt(loopStart.getWeek(settings.weekStart).slice(-1)) % 2 === 0) {
 										loopStart.setDate(loopStart.getDate() - 7);
 									}
 									if (loopStart > queryStart) {
@@ -479,7 +552,7 @@ var timeline = {
 										var startDate = new Date(Math.max(queryStart, thisWeek));
 										var endDate = new Date(Math.min(queryEnd, new Date(thisWeek.getFullYear(), thisWeek.getMonth(), thisWeek.getDate() + 14)));
 										result.push({
-											'label': thisWeek.getWeek() + '-' + new Date(thisWeek.getFullYear(), thisWeek.getMonth(), thisWeek.getDate() + 7).getWeek(),
+											'label': thisWeek.getWeek(settings.weekStart) + '-' + new Date(thisWeek.getFullYear(), thisWeek.getMonth(), thisWeek.getDate() + 7).getWeek(settings.weekStart),
 											'class': 'header row' + rowNum,
 											'start': dayDiff(queryStart, startDate),
 											'span': Math.max(1, dayDiff(startDate, endDate) - 1)
@@ -506,7 +579,7 @@ var timeline = {
 										var startDate = new Date(Math.max(queryStart, thisQuarter));
 										var endDate = new Date(Math.min(queryEnd, new Date(thisQuarter.getFullYear(), thisQuarter.getMonth() + 3, 0)));
 										result.push({
-											'label': thisQuarter.getQuarter(),
+											'label': thisQuarter.getQuarter(settings.yearStart),
 											'class': 'header row' + rowNum,
 											'start': dayDiff(queryStart, startDate),
 											'span': dayDiff(startDate, endDate)

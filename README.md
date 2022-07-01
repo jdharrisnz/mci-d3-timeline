@@ -6,6 +6,8 @@ This widget will aggregate the input data to the level of the selected 'main dim
 * your measurements will be summed, therefore it's not compatible with rate-type measurements, unless using dates from the same granularity of your main dimension; and
 * dimension data will be lost if dimensions are added with greater detail than your main dimension.
 
+After adding data to your widget, double-check the Design panel to make sure the selected dimension and measurement roles are correct.
+
 ![Preview image](image.png)
 
 ## Style and Script Dependencies

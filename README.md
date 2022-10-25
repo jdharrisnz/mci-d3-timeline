@@ -1,3 +1,6 @@
+# Archived
+This repo has been archived and consolidated into [mci-d3-custom-widgets](https://github.com/jdharrisnz/mci-d3-custom-widgets).
+
 # mci-d3-timeline
 Custom widget for Datorama. Interactive timeline with date aggregation, labels, groups, colour coding, tooltips, and progress bars.
 
